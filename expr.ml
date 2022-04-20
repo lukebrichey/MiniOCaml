@@ -60,8 +60,20 @@ let vars_of_list : string list -> varidset =
   
 (* free_vars exp -- Returns the set of `varid`s corresponding to free
    variables in `exp` *)
-let free_vars (exp : expr) : varidset =
-  failwith "free_vars not implemented" ;;
+let rec free_vars (exp : expr) : varidset =
+  match exp with
+  | Var v -> SS.singleton v
+  | Num _ 
+  | Bool _ 
+  | Raise
+  | Unassigned -> SS.empty
+  | Unop (_, e) -> free_vars e                 
+  | Binop (_, e1, e2)
+  | App (e1, e2) -> SS.union (free_vars e1) (free_vars e2)
+  | Conditional (e1, e2, e3) ->  SS.union (SS.union (free_vars e1) (free_vars e2)) (free_vars e3)
+  | Fun (v, e) -> SS.remove v (free_vars e)        
+  | Let (v, e1, e2) -> SS.union (SS.remove v (free_vars e2)) (free_vars e1)
+  | Letrec (v, e1, e2) -> SS.union (SS.remove v (free_vars e2)) (SS.remove v (free_vars e1));;
   
 (* new_varname () -- Returns a freshly minted `varid` constructed with
    a running counter a la `gensym`. Assumes no variable names use the
@@ -113,7 +125,7 @@ let rec exp_to_concrete_string (exp : expr) : string =
   | Letrec (v, e1, e2) -> "Let rec " ^ v ^ " = " ^ exp_to_concrete_string e1 ^ " in " ^ exp_to_concrete_string e2
   | Raise -> "Exception"
   | Unassigned -> "Unassigned"
-  | App (f, e) -> exp_to_concrete_string f ^ exp_to_concrete_string e ;;;;
+  | App (f, e) -> exp_to_concrete_string f ^ exp_to_concrete_string e ;;
      
 (* exp_to_abstract_string exp -- Return a string representation of the
    abstract syntax of the expression `exp` *)
