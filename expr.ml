@@ -160,8 +160,10 @@ let rec exp_to_concrete_string (exp : expr) : string =
                                  " then " ^ exp_to_concrete_string e2 ^ 
                                  " else " ^ exp_to_concrete_string e3
   | Fun (v, e) -> v ^ exp_to_concrete_string e                
-  | Let (v, e1, e2) -> "Let " ^ v ^ " = " ^ exp_to_concrete_string e1 ^ " in " ^ exp_to_concrete_string e2
-  | Letrec (v, e1, e2) -> "Let rec " ^ v ^ " = " ^ exp_to_concrete_string e1 ^ " in " ^ exp_to_concrete_string e2
+  | Let (v, e1, e2) -> 
+    "Let " ^ v ^ " = " ^ exp_to_concrete_string e1 ^ " in " ^ exp_to_concrete_string e2
+  | Letrec (v, e1, e2) -> 
+    "Let rec " ^ v ^ " = " ^ exp_to_concrete_string e1 ^ " in " ^ exp_to_concrete_string e2
   | Raise -> "Exception"
   | Unassigned -> "Unassigned"
   | App (f, e) -> exp_to_concrete_string f ^ exp_to_concrete_string e ;;

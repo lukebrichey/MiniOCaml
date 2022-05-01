@@ -115,8 +115,80 @@ let eval_t (exp : expr) (_env : Env.env) : Env.value =
 
 (* The SUBSTITUTION MODEL evaluator -- to be completed *)
    
-let eval_s (_exp : expr) (_env : Env.env) : Env.value =
-  failwith "eval_s not implemented" ;;
+let rec eval_s (exp : expr) (_env : Env.env) : Env.value =
+  match exp with
+  | Var v -> Val (Var v)
+  | Num x -> Val (Num x)
+  | Bool b -> Val (Bool b)
+  | Unop (u, e) -> 
+    let res = eval_s e _env in 
+    (match res with
+    | Val (Num x) -> Val (Num ~-x)
+    | _ -> Val (Raise))
+  | Binop (b, e1, e2) ->
+    (let res1 = eval_s e1 _env in 
+    let res2 = eval_s e2 _env in 
+    let res_check () =
+      match res1, res2 with
+      | Val (Num x1), Val (Num x2) -> Some true
+      | Val (Bool b1), Val (Bool b2) -> Some false
+      | _ -> None in
+    let check = res_check () in
+    if check <> None then
+      (match b with
+      | Equals -> Val (Bool ((res1) = (res2))) 
+      | LessThan -> Val (Bool ((res1) < (res2)))
+      | _ -> if check = Some true then 
+              Val (Num ((match b with
+                         | Plus -> (+)
+                         | Minus -> (-)
+                         | Times -> ( * )
+                         | _ -> raise (Invalid_argument "Match case never reached")) 
+                         (match res1 with
+                          | Val (Num x) -> x 
+                          | _ -> raise (Failure "Case never reached")) 
+                         (match res2 with
+                          | Val (Num x) -> x 
+                          | _ -> raise (Failure "Case never reached"))))
+             else
+              Val (Raise))
+    else
+      Val (Raise))
+  | Conditional (e1, e2, e3) -> 
+    (let res1 = eval_s e1 _env in 
+    let res2 = eval_s e2 _env in 
+    let res3 = eval_s e3 _env in 
+    match res1 with
+    | Val (Bool b) -> if b then res2 else res3 
+    | _ -> Val (Raise)) 
+  | Fun (v, e) -> Val (Fun (v, e))
+  | Let (v, e1, e2) -> 
+    (match eval_s e1 _env with 
+    | Val (x) -> eval_s (subst v x e2) _env
+    | _ -> Val (Raise))
+  | Letrec (v, e1, e2) -> 
+    (match eval_s e1 _env with
+     | Val (x) -> 
+        eval_s (subst v (Letrec (v, (match eval_s e1 _env with
+                                     | Val (x) -> x
+                                     | _ -> raise (EvalError "This shouldn't happen")),
+                                 Var v))
+                        (match eval_s e1 _env with
+                         | Val (x) -> x
+                         | _ -> raise (EvalError "This shouldn't happen")))
+                      _env
+     | _ -> raise (EvalError "This shouldn't happen"))
+  | Raise -> raise EvalException 
+  | Unassigned -> raise (EvalError "This shouldn't happen")
+  | App (e1, e2) -> 
+    (match eval_s e1 _env with 
+     | Val (Fun (v, e)) -> 
+        eval_s (subst v 
+                     (match eval_s e2 _env with
+                      | Val (x) -> x
+                      | _ -> raise (EvalError "Case never reached")) e) 
+                      _env
+     | _ -> Val (Raise)) ;;
      
 (* The DYNAMICALLY-SCOPED ENVIRONMENT MODEL evaluator -- to be
    completed *)
