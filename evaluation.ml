@@ -72,27 +72,29 @@ module Env : ENV =
 
     let lookup (env : env) (varname : varid) : value =
       try !(List.assoc varname env) with
-      | Not_found -> raise (EvalError "var undefined")
+      | Not_found -> raise (EvalError "Var undefined in environment")
 
-    let rec extend (env : env) (varname : varid) (loc : value ref) : env =
-     match env with
-      | [] -> [(varname, loc)]
-      | (var, _) :: tl -> 
-        if var == varname then (var, loc) :: tl else extend tl varname loc
+    let extend (env : env) (varname : varid) (loc : value ref) : env =
+      if List.mem_assoc varname env then
+        (varname, loc) :: (List.remove_assoc varname env)
+      else
+        (varname, loc) :: env
 
     let rec value_to_string ?(printenvp : bool = true) (v : value) : string =
       match v with
-      | Val (x) -> exp_to_concrete_string x 
+      | Val (x) -> 
+          exp_to_concrete_string x
       | Closure (exp, env) -> 
-        exp_to_concrete_string exp ^ (if printenvp then env_to_string env else "")
+          "Val = " ^ exp_to_concrete_string exp ^ 
+          ", Env : " ^ (if printenvp then env_to_string env else "{}")
         
 
     and env_to_string (env : env) : string =
       "{" ^ (List.fold_left (fun acc e -> 
-                        let var, value = e in 
-                        var ^ " |-> " ^value_to_string !value ^ "; " ^ acc) 
-                      "" 
-                      env) ^
+                            let var, value = e in 
+                            "" ^ var ^ " |-> " ^ value_to_string !value ^ ";" ^ acc) 
+                            "" 
+                            env) ^
       "}"
   end
 ;;
@@ -121,7 +123,13 @@ module Env : ENV =
 (* The TRIVIAL EVALUATOR, which leaves the expression to be evaluated
    essentially unchanged, just converted to a value for consistency
    with the signature of the evaluators. *)
-   
+
+(* HELPER *)
+let val_to_exp (v : Env.value) : expr =
+  match v with
+  | Val (x) -> x
+  | _ -> raise EvalException 
+
 let eval_t (exp : expr) (_env : Env.env) : Env.value =
   (* coerce the expr, unchanged, into a value *)
   Env.Val exp ;;
@@ -156,7 +164,7 @@ let rec eval_s (exp : expr) (env : Env.env) : Env.value =
                          | Plus -> (+)
                          | Minus -> (-)
                          | Times -> ( * )
-                         | _ -> raise (Invalid_argument "Match case never reached")) 
+                         | _ -> raise (Failure "Case never reached")) 
                          (match res1 with
                           | Env.Val (Num x) -> x 
                           | _ -> raise (Failure "Case never reached")) 
@@ -164,40 +172,43 @@ let rec eval_s (exp : expr) (env : Env.env) : Env.value =
                           | Env.Val (Num x) -> x 
                           | _ -> raise (Failure "Case never reached"))))
              else
-              Env.Val (Raise))
+              raise (EvalError "Operation not allowed"))
     else
-      Env.Val (Raise))
+     raise (EvalError "Operation not allowed"))
   | Conditional (e1, e2, e3) -> 
     (let res1 = eval_s e1 env in 
-    let res2 = eval_s e2 env in 
-    let res3 = eval_s e3 env in 
     match res1 with
-    | Env.Val (Bool b) -> if b then res2 else res3 
+    | Env.Val (Bool b) -> if b then eval_s e2 env else eval_s e3 env
     | _ -> Env.Val (Raise)) 
   | Fun (v, e) -> Env.Val (Fun (v, e))
   | Let (v, e1, e2) -> 
-    (match eval_s e1 env with 
+    (let x = val_to_exp (eval_s e1 env) in eval_s (subst v x e2) env)
+    (* (match eval_s e1 env with 
     | Env.Val (x) -> eval_s (subst v x e2) env
-    | _ -> Env.Val (Raise))
+    | _ -> Env.Val (Raise)) *)
   | Letrec (v, e1, e2) -> 
-    (match eval_s e1 env with
+    (let x = val_to_exp (eval_s e1 env) in 
+      let v_d = x in 
+      let v_dsub = subst v (Letrec (v, v_d, Var v)) v_d in 
+      let b_subbed = subst v v_dsub e2 in 
+      eval_s b_subbed env)
+    (* (match eval_s e1 env with
      | Env.Val (x) -> 
         let v_d = x in 
         let v_dsub = subst v (Letrec (v, v_d, Var v)) v_d in
         let b_subbed = subst v v_dsub e2 in 
         eval_s b_subbed env
-     | _ -> raise (EvalError "This shouldn't happen"))
+     | _ -> raise (EvalError "This shouldn't happen")) *)
   | Raise -> raise EvalException 
   | Unassigned -> raise (EvalError "This shouldn't happen")
-  | App (e1, e2) -> 
-    (match eval_s e1 env with 
-     | Env.Val (Fun (v, e)) -> 
+  | App (f, e) -> 
+    (match eval_s f env with 
+     | Env.Val (Fun (v, b)) -> 
         eval_s (subst v 
-                     (match eval_s e2 env with
-                      | Env.Val (x) -> x
-                      | _ -> raise (EvalError "Case never reached")) e) 
+                     (val_to_exp (eval_s e env)) 
+                      b) 
                       env
-     | _ -> Env.Val (Raise)) ;;
+     | _ -> raise (EvalError "Not a function, can't be applied")) ;;
      
 (* The DYNAMICALLY-SCOPED ENVIRONMENT MODEL evaluator -- to be
    completed *)
@@ -238,15 +249,13 @@ let rec eval_d (exp : expr) (env : Env.env) : Env.value =
                           | Env.Val (Num x) -> x 
                           | _ -> raise (Failure "Case never reached"))))
              else
-              Env.Val (Raise))
+              raise (EvalError "Operation not allowed"))
     else
-      Env.Val (Raise))
+      raise (EvalError "Operation not allowed"))
   | Conditional (e1, e2, e3) -> 
     (let res1 = eval_d e1 env in 
-    let res2 = eval_d e2 env in 
-    let res3 = eval_d e3 env in 
     match res1 with
-    | Env.Val (Bool b) -> if b then res2 else res3 
+    | Env.Val (Bool b) -> if b then eval_d e2 env else eval_d e3 env 
     | _ -> Env.Val (Raise)) 
   | Fun (v, e) -> Env.Val (Fun (v, e))
   | Let (v, e1, e2)
@@ -303,15 +312,13 @@ let rec eval_l (exp : expr) (env : Env.env) : Env.value =
                           | Env.Val (Num x) -> x 
                           | _ -> raise (Failure "Case never reached"))))
              else
-              Env.Val (Raise))
+              raise (EvalError "Operation not allowed"))
     else
-      Env.Val (Raise))
+      raise (EvalError "Operation not allowed"))
   | Conditional (e1, e2, e3) -> 
     (let res1 = eval_l e1 env in 
-    let res2 = eval_l e2 env in 
-    let res3 = eval_l e3 env in 
     match res1 with
-    | Env.Val (Bool b) -> if b then res2 else res3 
+    | Env.Val (Bool b) -> if b then eval_l e2 env else eval_l e3 env 
     | _ -> Env.Val (Raise)) 
   | Fun (v, b) -> Env.close (Fun (v, b)) env 
   | Let (v, e1, e2) -> 
@@ -352,4 +359,3 @@ let eval_e _ =
    set when you submit your solution.) *)
    
 let evaluate = eval_t ;;
-(* let rec does not work, eval_s *)

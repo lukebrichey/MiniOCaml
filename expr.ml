@@ -106,7 +106,7 @@ let rec subst (var_name : varid) (repl : expr) (exp : expr) : expr =
     | Var v -> if v = var_name then repl else Var v
     | Unop (u, e) -> Unop (u, sub e)
     | Binop (b, e1, e2) -> Binop (b, sub e1, sub e2)
-    | App (e1, e2) -> App (sub e1, sub e2)
+    | App (f, e) -> App (sub f, sub e)
     | Conditional (e1, e2, e3) -> Conditional (sub e1, sub e2, sub e3)
     | Fun (v, e) -> 
       if v = var_name then 
@@ -168,7 +168,7 @@ let rec exp_to_concrete_string (exp : expr) : string =
     "Let rec " ^ v ^ " = " ^ exp_to_concrete_string e1 ^ " in " ^ exp_to_concrete_string e2
   | Raise -> "Exception"
   | Unassigned -> "Unassigned"
-  | App (f, e) -> exp_to_concrete_string f ^ " " ^ exp_to_concrete_string e ;;
+  | App (f, e) -> "(" ^ exp_to_concrete_string f ^ ") " ^ exp_to_concrete_string e ;;
      
 (* exp_to_abstract_string exp -- Return a string representation of the
    abstract syntax of the expression `exp` *)
