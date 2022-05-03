@@ -68,19 +68,31 @@ module Env : ENV =
     let empty () : env = []
 
     let close (exp : expr) (env : env) : value =
-      failwith "close not implemented"
+      Closure (exp, env)
 
     let lookup (env : env) (varname : varid) : value =
-      failwith "lookup not implemented"
+      try !(List.assoc varname env) with
+      | Not_found -> raise (EvalError "var undefined")
 
-    let extend (env : env) (varname : varid) (loc : value ref) : env =
-      failwith "extend not implemented"
+    let rec extend (env : env) (varname : varid) (loc : value ref) : env =
+     match env with
+      | [] -> [(varname, loc)]
+      | (var, _) :: tl -> 
+        if var == varname then (var, loc) :: tl else extend tl varname loc
 
-    let value_to_string ?(printenvp : bool = true) (v : value) : string =
-      failwith "value_to_string not implemented"
+    let rec value_to_string ?(printenvp : bool = true) (v : value) : string =
+      match v with
+      | Val (x) -> exp_to_concrete_string x 
+      | Closure (exp, env) -> 
+        exp_to_concrete_string exp ^ (if printenvp then env_to_string env else "")
+        
 
-    let env_to_string (env : env) : string =
-      failwith "env_to_string not implemented"
+    and env_to_string (env : env) : string =
+      List.fold_left (fun acc e -> 
+                        let var, value = e in 
+                        "{" ^ var ^ value_to_string !value ^ "; " ^ acc ^ "}" ) 
+                      "" 
+                      env
   end
 ;;
 
@@ -115,23 +127,23 @@ let eval_t (exp : expr) (_env : Env.env) : Env.value =
 
 (* The SUBSTITUTION MODEL evaluator -- to be completed *)
    
-let rec eval_s (exp : expr) (_env : Env.env) : Env.value =
+let rec eval_s (exp : expr) (env : Env.env) : Env.value =
   match exp with
-  | Var v -> Val (Var v)
+  | Var v -> raise (EvalError ("Unbound variable " ^ v))
   | Num x -> Val (Num x)
   | Bool b -> Val (Bool b)
-  | Unop (u, e) -> 
-    let res = eval_s e _env in 
+  | Unop (_, e) -> 
+    let res = eval_s e env in 
     (match res with
     | Val (Num x) -> Val (Num ~-x)
     | _ -> Val (Raise))
   | Binop (b, e1, e2) ->
-    (let res1 = eval_s e1 _env in 
-    let res2 = eval_s e2 _env in 
+    (let res1 = eval_s e1 env in 
+    let res2 = eval_s e2 env in 
     let res_check () =
       match res1, res2 with
-      | Val (Num x1), Val (Num x2) -> Some true
-      | Val (Bool b1), Val (Bool b2) -> Some false
+      | Val (Num _), Val (Num _) -> Some true
+      | Val (Bool _), Val (Bool _) -> Some false
       | _ -> None in
     let check = res_check () in
     if check <> None then
@@ -155,52 +167,172 @@ let rec eval_s (exp : expr) (_env : Env.env) : Env.value =
     else
       Val (Raise))
   | Conditional (e1, e2, e3) -> 
-    (let res1 = eval_s e1 _env in 
-    let res2 = eval_s e2 _env in 
-    let res3 = eval_s e3 _env in 
+    (let res1 = eval_s e1 env in 
+    let res2 = eval_s e2 env in 
+    let res3 = eval_s e3 env in 
     match res1 with
     | Val (Bool b) -> if b then res2 else res3 
     | _ -> Val (Raise)) 
   | Fun (v, e) -> Val (Fun (v, e))
   | Let (v, e1, e2) -> 
-    (match eval_s e1 _env with 
-    | Val (x) -> eval_s (subst v x e2) _env
+    (match eval_s e1 env with 
+    | Val (x) -> eval_s (subst v x e2) env
     | _ -> Val (Raise))
   | Letrec (v, e1, e2) -> 
-    (match eval_s e1 _env with
+    (match eval_s e1 env with
      | Val (x) -> 
-        eval_s (subst v (Letrec (v, (match eval_s e1 _env with
-                                     | Val (x) -> x
-                                     | _ -> raise (EvalError "This shouldn't happen")),
-                                 Var v))
-                        (match eval_s e1 _env with
-                         | Val (x) -> x
-                         | _ -> raise (EvalError "This shouldn't happen")))
-                      _env
+        let v_d = x in 
+        let v_dsub = subst v (Letrec (v, v_d, Var v)) v_d in
+        let b_subbed = subst v v_dsub e2 in 
+        eval_s b_subbed env
      | _ -> raise (EvalError "This shouldn't happen"))
   | Raise -> raise EvalException 
   | Unassigned -> raise (EvalError "This shouldn't happen")
   | App (e1, e2) -> 
-    (match eval_s e1 _env with 
+    (match eval_s e1 env with 
      | Val (Fun (v, e)) -> 
         eval_s (subst v 
-                     (match eval_s e2 _env with
+                     (match eval_s e2 env with
                       | Val (x) -> x
                       | _ -> raise (EvalError "Case never reached")) e) 
-                      _env
+                      env
      | _ -> Val (Raise)) ;;
      
 (* The DYNAMICALLY-SCOPED ENVIRONMENT MODEL evaluator -- to be
    completed *)
    
-let eval_d (_exp : expr) (_env : Env.env) : Env.value =
-  failwith "eval_d not implemented" ;;
+let rec eval_d (exp : expr) (env : Env.env) : Env.value =
+  match exp with
+  | Var v -> Env.lookup env v
+  | Num x -> Val (Num x)
+  | Bool b -> Val (Bool b)
+  | Unop (_, e) -> 
+    let res = eval_d e env in 
+    (match res with
+    | Val (Num x) -> Val (Num ~-x)
+    | _ -> Val (Raise))
+  | Binop (b, e1, e2) ->
+    (let res1 = eval_d e1 env in 
+    let res2 = eval_d e2 env in 
+    let res_check () =
+      match res1, res2 with
+      | Val (Num _), Val (Num _) -> Some true
+      | Val (Bool _), Val (Bool _) -> Some false
+      | _ -> None in
+    let check = res_check () in
+    if check <> None then
+      (match b with
+      | Equals -> Val (Bool ((res1) = (res2))) 
+      | LessThan -> Val (Bool ((res1) < (res2)))
+      | _ -> if check = Some true then 
+              Val (Num ((match b with
+                         | Plus -> (+)
+                         | Minus -> (-)
+                         | Times -> ( * )
+                         | _ -> raise (Invalid_argument "Match case never reached")) 
+                         (match res1 with
+                          | Val (Num x) -> x 
+                          | _ -> raise (Failure "Case never reached")) 
+                         (match res2 with
+                          | Val (Num x) -> x 
+                          | _ -> raise (Failure "Case never reached"))))
+             else
+              Val (Raise))
+    else
+      Val (Raise))
+  | Conditional (e1, e2, e3) -> 
+    (let res1 = eval_d e1 env in 
+    let res2 = eval_d e2 env in 
+    let res3 = eval_d e3 env in 
+    match res1 with
+    | Val (Bool b) -> if b then res2 else res3 
+    | _ -> Val (Raise)) 
+  | Fun (v, e) -> Val (Fun (v, e))
+  | Let (v, e1, e2)
+  | Letrec (v, e1, e2) -> 
+    let v_d = eval_d e1 env in 
+    let v_b = eval_d e2 (Env.extend env v (ref v_d)) in 
+    v_b
+  | Raise -> raise EvalException 
+  | Unassigned -> raise (EvalError "Encountered Unassigned expression")
+  | App (f, e2) -> 
+    let v_p = eval_d f env in 
+     match v_p with
+     | Val (Fun (v, b)) -> 
+      (let v_q = eval_d e2 env in 
+      eval_d b (Env.extend env v (ref v_q)))
+     | _ -> raise (EvalError "v_p not a function") ;;
        
 (* The LEXICALLY-SCOPED ENVIRONMENT MODEL evaluator -- optionally
    completed as (part of) your extension *)
    
-let eval_l (_exp : expr) (_env : Env.env) : Env.value =
-  failwith "eval_l not implemented" ;;
+let rec eval_l (exp : expr) (env : Env.env) : Env.value =
+  match exp with
+  | Var v -> Env.lookup env v
+  | Num x -> Val (Num x)
+  | Bool b -> Val (Bool b)
+  | Unop (_, e) -> 
+    let res = eval_l e env in 
+    (match res with
+    | Val (Num x) -> Val (Num ~-x)
+    | _ -> Val (Raise))
+  | Binop (b, e1, e2) ->
+    (let res1 = eval_l e1 env in 
+    let res2 = eval_l e2 env in 
+    let res_check () =
+      match res1, res2 with
+      | Val (Num _), Val (Num _) -> Some true
+      | Val (Bool _), Val (Bool _) -> Some false
+      | _ -> None in
+    let check = res_check () in
+    if check <> None then
+      (match b with
+      | Equals -> Val (Bool ((res1) = (res2))) 
+      | LessThan -> Val (Bool ((res1) < (res2)))
+      | _ -> if check = Some true then 
+              Val (Num ((match b with
+                         | Plus -> (+)
+                         | Minus -> (-)
+                         | Times -> ( * )
+                         | _ -> raise (Invalid_argument "Match case never reached")) 
+                         (match res1 with
+                          | Val (Num x) -> x 
+                          | _ -> raise (Failure "Case never reached")) 
+                         (match res2 with
+                          | Val (Num x) -> x 
+                          | _ -> raise (Failure "Case never reached"))))
+             else
+              Val (Raise))
+    else
+      Val (Raise))
+  | Conditional (e1, e2, e3) -> 
+    (let res1 = eval_l e1 env in 
+    let res2 = eval_l e2 env in 
+    let res3 = eval_l e3 env in 
+    match res1 with
+    | Val (Bool b) -> if b then res2 else res3 
+    | _ -> Val (Raise)) 
+  | Fun (v, b) -> Env.close (Fun (v, b)) env 
+  | Let (v, e1, e2) -> 
+    let v_d = eval_l e1 env in 
+    let v_b = eval_l e2 (Env.extend env v (ref v_d)) in 
+    v_b
+  | Letrec (v, e1, e2) -> 
+    let placeholder = ref (Env.Val (Unassigned)) in
+    let env_x = Env.extend env v placeholder in 
+    let v_d = eval_l e1 env_x in 
+    placeholder := v_d; 
+    eval_l e2 env_x
+  | Raise -> raise EvalException 
+  | Unassigned -> raise (EvalError "Encountered Unassigned expression")
+  | App (f, e) -> 
+    let clos = eval_l f env in 
+    match clos with
+    | Closure (Fun (v, b), env') -> 
+      let v_q = eval_l e env in 
+      let env_l = Env.extend env' v (ref v_q) in 
+      eval_l b env_l 
+    | _ -> raise (EvalError "This is not a function, it cannot be applied") ;;
 
 (* The EXTENDED evaluator -- if you want, you can provide your
    extension as a separate evaluator, or if it is type- and
@@ -218,4 +350,4 @@ let eval_e _ =
    above, not the `evaluate` function, so it doesn't matter how it's
    set when you submit your solution.) *)
    
-let evaluate = eval_t ;;
+let evaluate = eval_s ;;

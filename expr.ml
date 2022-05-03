@@ -66,10 +66,12 @@ let rec free_vars (exp : expr) : varidset =
   | Unop (_, e) -> free_vars e                 
   | Binop (_, e1, e2)
   | App (e1, e2) -> SS.union (free_vars e1) (free_vars e2)
-  | Conditional (e1, e2, e3) ->  SS.union (SS.union (free_vars e1) (free_vars e2)) (free_vars e3)
+  | Conditional (e1, e2, e3) ->  
+    SS.union (SS.union (free_vars e1) (free_vars e2)) (free_vars e3)
   | Fun (v, e) -> SS.remove v (free_vars e)        
   | Let (v, e1, e2) -> SS.union (SS.remove v (free_vars e2)) (free_vars e1)
-  | Letrec (v, e1, e2) -> SS.union (SS.remove v (free_vars e2)) (SS.remove v (free_vars e1))
+  | Letrec (v, e1, e2) -> 
+    SS.union (SS.remove v (free_vars e2)) (SS.remove v (free_vars e1))
   | _ -> SS.empty ;;
   
 (* new_varname () -- Returns a freshly minted `varid` constructed with
