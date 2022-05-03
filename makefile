@@ -1,5 +1,7 @@
 all: evaluation expr miniml tests
 
+mini: evaluation expr miniml
+
 evaluation: evaluation.ml
 	ocamlbuild -use-ocamlfind evaluation.byte
 

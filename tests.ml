@@ -42,14 +42,15 @@ let fun3 = Fun (var1, Binop (Times, Var (var1), num1)) ;;
 let let1 = Let ("f1", fun1, App (Var("f1"), num2)) ;; 
 let let2 = Let ("f2", fun2, App (Var("f2"), bool_t)) ;; 
 
-
-(* Test letrecs *)
+(* Test letrec *)
 let fact = 
     Letrec ("fact", Fun ("n", Conditional (Binop (Equals, Var ("n"), Num (0)), 
                                             Num (1),
                                            Binop (Times, Var ("n"), App (Var ("fact"), Binop (Minus, Var ("n"), Num (1)))))), 
             App (Var ("fact"), 
             Num (3))) ;;
+
+
 
 (* Tests for exp_to_concrete string and exp_to_abstract string *)
 let stage1_tests () = 
@@ -72,10 +73,32 @@ let stage1_tests () =
         "Num (1)))))), App (Var (fact), Num (3)))")
     "exp_a fact" ;;
 
+let stage2_tests () = 
+    unit_test (Expr.free_vars (Num 2) = Expr.vars_of_list []) 
+        "free_vars num";
+    unit_test (Expr.free_vars (Var ("x")) = Expr.vars_of_list ["x"]) 
+        "free_vars var x";
+    unit_test (Expr.free_vars (Let ("f", Fun ("y", 
+                                            Binop (Plus, Binop (Plus, Var ("x"), Var ("z")), 
+                                                         Var ("y"))), 
+                                        App (Var ("f"), Var ("w")))) 
+                = Expr.vars_of_list ["x"; "z"; "w"])
+        "free_vars binop + fun + app + let";
+    unit_test (Expr.free_vars (App (Var ("f"), Var ("x"))) = Expr.vars_of_list ["f"; "x"]) 
+        "free_vars app";
+    unit_test (Expr.free_vars (Let ("x", Binop (Plus, Var ("x"), Num (2)), Binop (Plus, Var ("x"), Var ("y"))))
+               = Expr.vars_of_list ["y"; "x"])
+        "free_vars let";
+    unit_test (Expr.free_vars (Let ("x", Fun ("y", Var ("x")), Var ("x")))
+               = Expr.vars_of_list ["x"])
+        "free vars let + app";; 
+
 let tests () =
   (* stage1 tests *)
   stage1_tests ();
-
+  (* stage2 tests *)
+  stage2_tests ();
+  
   () ;;
 
 let _ = tests () ;;
