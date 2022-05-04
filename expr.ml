@@ -156,7 +156,7 @@ let rec exp_to_concrete_string (exp : expr) : string =
   match exp with
   | Var v -> v
   | Float x -> string_of_float x
-  | String s -> s
+  | String s -> "\"" ^ s ^ "\""
   | Num x -> string_of_int x
   | Bool b -> string_of_bool b   
   | Unop (_, e) -> "~-" ^ exp_to_concrete_string e                 

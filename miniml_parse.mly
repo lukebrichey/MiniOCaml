@@ -11,6 +11,7 @@
 %token OPEN CLOSE
 %token LET DOT IN REC
 %token NEG
+%token CONCAT
 %token PLUS MINUS FMINUS FPLUS
 %token TIMES FTIMES
 %token LESSTHAN GREATERTHAN EQUALS
@@ -18,13 +19,14 @@
 %token FUNCTION
 %token RAISE
 %token <string> ID
+%token <string> STRING
 %token <int> INT 
 %token <float> FLOAT 
 %token TRUE FALSE
 
 %nonassoc IF
 %left LESSTHAN EQUALS GREATERTHAN
-%left PLUS MINUS FPLUS FMINUS
+%left PLUS MINUS FPLUS FMINUS CONCAT
 %left TIMES FTIMES
 %nonassoc NEG
 
@@ -39,10 +41,12 @@ exp:    exp expnoapp            { App($1, $2) }
         | expnoapp              { $1 }
 
 expnoapp: INT                   { Num $1 }
+        | STRING                { String $1 }
         | FLOAT                 { Float $1 }
         | TRUE                  { Bool true }
         | FALSE                 { Bool false }
         | ID                    { Var $1 }
+        | exp CONCAT exp        { Binop(Concat, $1, $3) }
         | exp PLUS exp          { Binop(Plus, $1, $3) }
         | exp FPLUS exp         { Binop(FPlus, $1, $3) }
         | exp MINUS exp         { Binop(Minus, $1, $3) }

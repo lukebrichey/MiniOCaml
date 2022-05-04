@@ -132,6 +132,10 @@ let val_to_exp (v : Env.value) : expr =
 
 let binopeval (b : binop) (exp1 : expr) (exp2 : expr) : expr =
   match b with
+  | Concat -> 
+    (match exp1, exp2 with
+     | String s1, String s2 -> String (s1 ^ s2)
+     | _ -> raise (EvalError "Expected String"))
   | Plus -> 
     (match exp1, exp2  with
     | Num x1, Num x2 -> Num (x1 + x2)
@@ -184,6 +188,7 @@ let eval_t (exp : expr) (_env : Env.env) : Env.value =
 let rec eval_s (exp : expr) (env : Env.env) : Env.value =
   match exp with
   | Var v -> raise (EvalError ("Unbound variable " ^ v))
+  | String s -> Env.Val (String s)
   | Num x -> Env.Val (Num x)
   | Float x -> Env.Val (Float x)
   | Bool b -> Env.Val (Bool b)
@@ -227,6 +232,7 @@ let rec eval_s (exp : expr) (env : Env.env) : Env.value =
 let rec eval_d (exp : expr) (env : Env.env) : Env.value =
   match exp with
   | Var v -> Env.lookup env v
+  | String s -> Env.Val (String s)
   | Num x -> Env.Val (Num x)
   | Float x -> Env.Val (Float x)
   | Bool b -> Env.Val (Bool b)
@@ -264,6 +270,7 @@ let rec eval_d (exp : expr) (env : Env.env) : Env.value =
 let rec eval_l (exp : expr) (env : Env.env) : Env.value =
   match exp with
   | Var v -> Env.lookup env v
+  | String s -> Env.Val (String s)
   | Float x -> Env.Val (Float x)
   | Num x -> Env.Val (Num x)
   | Bool b -> Env.Val (Bool b)
@@ -319,4 +326,4 @@ let eval_e _ =
    above, not the `evaluate` function, so it doesn't matter how it's
    set when you submit your solution.) *)
    
-let evaluate = eval_l ;;
+let evaluate = eval_s ;;

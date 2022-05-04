@@ -30,6 +30,7 @@
                      
   let sym_table = 
     create_hashtable 8 [
+                       ("^", CONCAT);
                        ("=", EQUALS);
                        ("<", LESSTHAN);
                        (">", LESSTHAN);
@@ -52,12 +53,16 @@ let digit = ['0'-'9']
 let deci = '.' digit*
 let float = digit* deci?
 let id = ['a'-'z'] ['a'-'z' '0'-'9']*
-let quotes = ['"']
-let string = [^ '"' '\\']+
+let string = ['"']  [^ '"' '\\']+ ['"']
 let sym = ['(' ')'] | (['$' '&' '*' '+' '-' '/' '=' '<' '>' '^' 
                             '.' '~' ';' '!' '?' '%' ':' '#']+)
 
-rule token = parse 
+rule token = parse
+  | string as s 
+        { let new_s = String.split_on_char '"' s in
+          let final_s = List.nth new_s 1 in
+          STRING final_s
+        }
   | float as fnum
         { let num = float_of_string fnum in
           FLOAT num

@@ -35,7 +35,8 @@ let binop_floats = Binop (GreaterThan, fl1, fl2) ;;
 let binop_bool1 = Binop (Equals, bool_t, bool_f) ;; 
 let binop_comp_int = Binop (LessThan, num1, num2) ;; 
 let binop_bool2 = Binop (LessThan, bool_t, bool_f) ;;
-let binop_broken = Binop (Plus, bool_f, bool_t) ;;  
+let binop_broken = Binop (Plus, bool_f, bool_t) ;; 
+let binop_string = Binop (Concat, String ("CS"), String ("51")) ;; 
 
 (* Test conditionals *)
 let cond_1 = Conditional (bool_t, num1, num2) ;; 
@@ -73,7 +74,8 @@ let stage1_tests () =
     unit_test (exp_to_concrete_string bool_t = "true") "exp_c Bool";
     unit_test (exp_to_concrete_string unop = "~-2") "exp_c Unop";
     unit_test (exp_to_concrete_string binop_ints = "2 + 17") "exp_c Binop";
-    unit_test (exp_to_concrete_string cond_1 = "if true then 2 else 35") "exp_c Cond";
+    unit_test (exp_to_concrete_string cond_1 = "if true then 2 else 35") 
+        "exp_c Cond";
     unit_test (exp_to_concrete_string fun1 = "fun x -> x + 2") "exp_c Fun";
     unit_test (exp_to_concrete_string let1 = 
                 "Let f1 = fun x -> x + 2 in (f1) 35") 
@@ -81,9 +83,9 @@ let stage1_tests () =
 
     (* exp_to_abstract_string tests *)
     unit_test (exp_to_abstract_string fact = 
-        "Letrec (fact, Fun (n, Conditional (Binop (Equals, Var (n), Num (0)), " ^
-        "Num (1), Binop (Times, Var (n), App (Var (fact), Binop (Minus, Var (n), " ^
-        "Num (1)))))), App (Var (fact), Num (3)))")
+        "Letrec (fact, Fun (n, Conditional (Binop (Equals, Var (n), Num (0)), " 
+        ^ "Num (1), Binop (Times, Var (n), App (Var (fact), Binop (Minus, Var (n), " 
+        ^ "Num (1)))))), App (Var (fact), Num (3)))")
     "exp_a fact" ;;
 
 let stage2_tests () = 
@@ -190,6 +192,8 @@ let stage4_tests () =
         "eval_s binop_float 2";
     unit_test (eval_s binop_floats empty = Env.Val (Bool (true)))
         "eval_s binop floats + greater than operator";
+    unit_test (eval_s binop_string empty = Env.Val (String ("CS51")))
+        "eval_s binop concat string";
     unit_test (try 
                 eval_s binop_broken empty <> eval_s binop_broken empty 
               with 
@@ -253,6 +257,8 @@ let stage7_tests () =
         "eval_d binop_float 2";
     unit_test (eval_d binop_floats empty = Env.Val (Bool (true)))
         "eval_d binop floats + greater than operator";
+    unit_test (eval_d binop_string empty = Env.Val (String ("CS51")))
+        "eval_d binop concat string";
     unit_test (try 
                 eval_d binop_broken empty <> eval_d binop_broken empty 
               with 
@@ -301,6 +307,8 @@ let stage8_tests () =
         "eval_l binop_float 2";
     unit_test (eval_l binop_floats empty = Env.Val (Bool (true)))
         "eval_l binop floats + greater than operator";
+    unit_test (eval_l binop_string empty = Env.Val (String ("CS51")))
+        "eval_l binop concat string";
     unit_test (try 
                 eval_l binop_broken empty <> eval_l binop_broken empty 
               with 
