@@ -15,6 +15,10 @@ let num1 = Num 2 ;;
 let num2 = Num 35 ;; 
 let num3 = Num 17 ;;
 
+(* Test floats *)
+let fl1 = Float 2.5;;
+let fl2 = Float 1.0 ;;
+
 (* Test bools *)
 let bool_t = Bool true ;;
 let bool_f = Bool false ;;  
@@ -25,6 +29,9 @@ let broken_unop = Unop (Negate, bool_t) ;;
 
 (* Test binops *)
 let binop_ints = Binop (Plus, num1, num3) ;; 
+let binop_f1 = Binop (FPlus, fl1, fl2) ;;
+let binop_f2 = Binop (FTimes, fl1, fl2) ;;
+let binop_floats = Binop (GreaterThan, fl1, fl2) ;; 
 let binop_bool1 = Binop (Equals, bool_t, bool_f) ;; 
 let binop_comp_int = Binop (LessThan, num1, num2) ;; 
 let binop_bool2 = Binop (LessThan, bool_t, bool_f) ;;
@@ -177,6 +184,12 @@ let stage4_tests () =
         "eval_s fun";
     unit_test (eval_s binop_ints empty = Env.Val (Num (19)))
         "eval_s binop";
+    unit_test (eval_s binop_f1 empty = Env.Val (Float (3.5)))
+        "eval_s binop_float 1";
+    unit_test (eval_s binop_f2 empty = Env.Val (Float (2.5)))
+        "eval_s binop_float 2";
+    unit_test (eval_s binop_floats empty = Env.Val (Bool (true)))
+        "eval_s binop floats + greater than operator";
     unit_test (try 
                 eval_s binop_broken empty <> eval_s binop_broken empty 
               with 
@@ -200,9 +213,11 @@ let stage6_tests () =
               with 
                 EvalError (_) -> true | _ -> false)
         "lookup fail";
-    unit_test (Env.value_to_string (Closure (Num (1), empty)) = "Val = 1, Env : {}")
+    unit_test (Env.value_to_string (Closure (Num (1), empty)) 
+                = "Closure (Val = 1, Env : {})")
         "value_to_string closure w env";
-    unit_test (Env.value_to_string ~printenvp: false (Closure (Num (1), empty)) = "Val = 1, Env : {}")
+    unit_test (Env.value_to_string ~printenvp: false (Closure (Num (1), empty)) 
+                = "Closure (Val = 1, Env : {})")
         "value_to_string closure w/o env";
     let test_env = 
         Env.extend (Env.extend empty "x" (ref (Env.Val (Num 2)))) "y" (ref (Env.Val (Num 17))) in
@@ -232,6 +247,12 @@ let stage7_tests () =
         "eval_d fun";
     unit_test (eval_d binop_ints empty = Env.Val (Num (19)))
         "eval_d binop";
+    unit_test (eval_d binop_f1 empty = Env.Val (Float (3.5)))
+        "eval_d binop_float 1";
+    unit_test (eval_d binop_f2 empty = Env.Val (Float (2.5)))
+        "eval_d binop_float 2";
+    unit_test (eval_d binop_floats empty = Env.Val (Bool (true)))
+        "eval_d binop floats + greater than operator";
     unit_test (try 
                 eval_d binop_broken empty <> eval_d binop_broken empty 
               with 
@@ -253,12 +274,12 @@ let stage7_tests () =
                 eval_d (App (Num (4), Num (3))) empty <> eval_d (App (Num (4), Num (3))) empty
               with
                 EvalError (_) -> true | _ -> false) 
-        "eval_d App fail";
-    unit_test (eval_d fact empty = Env.Val (Num 6))
-        "eval_d let rec + conditional + app";;
+        "eval_d App fail";;
+    (* unit_test (eval_d fact empty = Env.Val (Num 6))
+        "eval_d let rec + conditional + app";; *)
 
 let stage8_tests () =
-    let empty = Env.empty () in 
+     let empty = Env.empty () in
     (* Lexical environment evaluation tests *)
     unit_test (eval_l num1 empty = Env.Val (num1))
         "eval_l Num/other literals";
@@ -269,10 +290,17 @@ let stage8_tests () =
         "eval_l unbound Var";
     unit_test (eval_l cond_1 empty = Env.Val (num1))
         "eval_l conditional";
-    unit_test (Env.value_to_string (eval_l fun1 empty) = "Val = fun x -> x + 2, Env : {}")
+    unit_test (Env.value_to_string (eval_l fun1 empty) 
+                = "Closure (Val = fun x -> x + 2, Env : {})")
         "eval_l fun";
     unit_test (eval_l binop_ints empty = Env.Val (Num (19)))
         "eval_l binop";
+    unit_test (eval_l binop_f1 empty = Env.Val (Float (3.5)))
+        "eval_l binop_float 1";
+    unit_test (eval_l binop_f2 empty = Env.Val (Float (2.5)))
+        "eval_l binop_float 2";
+    unit_test (eval_l binop_floats empty = Env.Val (Bool (true)))
+        "eval_l binop floats + greater than operator";
     unit_test (try 
                 eval_l binop_broken empty <> eval_l binop_broken empty 
               with 
@@ -289,14 +317,14 @@ let stage8_tests () =
     let test_env = 
         Env.extend (Env.extend empty "x" (ref (Env.Val (Num 2)))) "y" (ref (Env.Val (Num 17))) in 
     unit_test (eval_l (Binop (Plus, Var ("x"), Var ("y"))) test_env = Env.Val (Num 19))
-        "eval_l environment needed";
+        "eval_l environment needed"; 
     unit_test (try
                 eval_l (App (Num (4), Num (3))) empty <> eval_l (App (Num (4), Num (3))) empty
               with
                 EvalError (_) -> true | _ -> false) 
         "eval_l App fail";
     unit_test (eval_l fact empty = Env.Val (Num 6))
-        "eval_l let rec + conditional + app";;
+        "eval_l let rec + conditional + app" ;;
     
 let tests () =
   (* stage1 tests *)

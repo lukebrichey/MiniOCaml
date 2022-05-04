@@ -85,8 +85,8 @@ module Env : ENV =
       | Val (x) -> 
           exp_to_concrete_string x
       | Closure (exp, env) -> 
-          "Val = " ^ exp_to_concrete_string exp ^ 
-          ", Env : " ^ (if printenvp then env_to_string env else "{}")
+          "Closure (Val = " ^ exp_to_concrete_string exp ^ 
+          ", Env : " ^ (if printenvp then env_to_string env ^ ")" else "{})")
         
 
     and env_to_string (env : env) : string =
@@ -124,11 +124,56 @@ module Env : ENV =
    essentially unchanged, just converted to a value for consistency
    with the signature of the evaluators. *)
 
-(* HELPER *)
+(* HELPERS *)
 let val_to_exp (v : Env.value) : expr =
   match v with
   | Val (x) -> x
-  | _ -> raise EvalException 
+  | _ -> raise EvalException
+
+let binopeval (b : binop) (exp1 : expr) (exp2 : expr) : expr =
+  match b with
+  | Plus -> 
+    (match exp1, exp2  with
+    | Num x1, Num x2 -> Num (x1 + x2)
+    | _ -> raise (EvalError "Expected Num"))
+  | FPlus -> 
+    (match exp1, exp2  with
+    | Float x1, Float x2 -> Float (x1 +. x2)
+    | _ -> raise (EvalError "Expected Float"))
+  | Minus -> 
+    (match exp1, exp2  with
+    | Num x1, Num x2 -> Num (x1 - x2)
+    | _ -> raise (EvalError "Expected Num"))
+  | FMinus ->
+    (match exp1, exp2  with
+    | Float x1, Float x2 -> Float (x1 -. x2)
+    | _ -> raise (EvalError "Expected Float"))
+  | Times ->
+    (match exp1, exp2  with
+    | Num x1, Num x2 -> Num (x1 * x2)
+    | _ -> raise (EvalError "Expected Num"))
+  | FTimes -> 
+    (match exp1, exp2  with
+    | Float x1, Float x2 -> Float (x1 *. x2)
+    | _ -> raise (EvalError "Expected Float"))
+  | Equals ->
+    (match exp1, exp2  with
+    | Float x1, Float x2 -> Bool (x1 = x2)
+    | Num x1, Num x2 -> Bool (x1 = x2)
+    | Bool x1, Bool x2 -> Bool (x1 = x2)
+    | _ -> raise (EvalError "Operation not allowed"))
+  | GreaterThan ->
+    (match exp1, exp2  with
+    | Float x1, Float x2 -> Bool (x1 > x2)
+    | Num x1, Num x2 -> Bool (x1 > x2)
+    | Bool x1, Bool x2 -> Bool (x1 > x2)
+    | _ -> raise (EvalError "Operation not allowed"))
+  | LessThan ->
+    (match exp1, exp2  with
+    | Float x1, Float x2 -> Bool (x1 < x2)
+    | Num x1, Num x2 -> Bool (x1 < x2)
+    | Bool x1, Bool x2 -> Bool (x1 < x2)
+    | _ -> raise (EvalError "Operation not allowed"))
 
 let eval_t (exp : expr) (_env : Env.env) : Env.value =
   (* coerce the expr, unchanged, into a value *)
@@ -140,6 +185,7 @@ let rec eval_s (exp : expr) (env : Env.env) : Env.value =
   match exp with
   | Var v -> raise (EvalError ("Unbound variable " ^ v))
   | Num x -> Env.Val (Num x)
+  | Float x -> Env.Val (Float x)
   | Bool b -> Env.Val (Bool b)
   | Unop (_, e) -> 
     let res = eval_s e env in 
@@ -147,34 +193,9 @@ let rec eval_s (exp : expr) (env : Env.env) : Env.value =
     | Env.Val (Num x) -> Env.Val (Num ~-x)
     | _ -> Env.Val (Raise))
   | Binop (b, e1, e2) ->
-    (let res1 = eval_s e1 env in 
+    let res1 = eval_s e1 env in 
     let res2 = eval_s e2 env in 
-    let res_check () =
-      match res1, res2 with
-      | Env.Val (Num _), Env.Val (Num _) -> Some true
-      | Env.Val (Bool _), Env.Val (Bool _) -> Some false
-      | _ -> None in
-    let check = res_check () in
-    if check <> None then
-      (match b with
-      | Equals -> Env.Val (Bool ((res1) = (res2))) 
-      | LessThan -> Env.Val (Bool ((res1) < (res2)))
-      | _ -> if check = Some true then 
-              Env.Val (Num ((match b with
-                         | Plus -> (+)
-                         | Minus -> (-)
-                         | Times -> ( * )
-                         | _ -> raise (Failure "Case never reached")) 
-                         (match res1 with
-                          | Env.Val (Num x) -> x 
-                          | _ -> raise (Failure "Case never reached")) 
-                         (match res2 with
-                          | Env.Val (Num x) -> x 
-                          | _ -> raise (Failure "Case never reached"))))
-             else
-              raise (EvalError "Operation not allowed"))
-    else
-     raise (EvalError "Operation not allowed"))
+    Val (binopeval b (val_to_exp res1) (val_to_exp res2))
   | Conditional (e1, e2, e3) -> 
     (let res1 = eval_s e1 env in 
     match res1 with
@@ -182,23 +203,13 @@ let rec eval_s (exp : expr) (env : Env.env) : Env.value =
     | _ -> Env.Val (Raise)) 
   | Fun (v, e) -> Env.Val (Fun (v, e))
   | Let (v, e1, e2) -> 
-    (let x = val_to_exp (eval_s e1 env) in eval_s (subst v x e2) env)
-    (* (match eval_s e1 env with 
-    | Env.Val (x) -> eval_s (subst v x e2) env
-    | _ -> Env.Val (Raise)) *)
+    let x = val_to_exp (eval_s e1 env) in eval_s (subst v x e2) env
   | Letrec (v, e1, e2) -> 
-    (let x = val_to_exp (eval_s e1 env) in 
+      let x = val_to_exp (eval_s e1 env) in 
       let v_d = x in 
       let v_dsub = subst v (Letrec (v, v_d, Var v)) v_d in 
       let b_subbed = subst v v_dsub e2 in 
-      eval_s b_subbed env)
-    (* (match eval_s e1 env with
-     | Env.Val (x) -> 
-        let v_d = x in 
-        let v_dsub = subst v (Letrec (v, v_d, Var v)) v_d in
-        let b_subbed = subst v v_dsub e2 in 
-        eval_s b_subbed env
-     | _ -> raise (EvalError "This shouldn't happen")) *)
+      eval_s b_subbed env
   | Raise -> raise EvalException 
   | Unassigned -> raise (EvalError "This shouldn't happen")
   | App (f, e) -> 
@@ -217,6 +228,7 @@ let rec eval_d (exp : expr) (env : Env.env) : Env.value =
   match exp with
   | Var v -> Env.lookup env v
   | Num x -> Env.Val (Num x)
+  | Float x -> Env.Val (Float x)
   | Bool b -> Env.Val (Bool b)
   | Unop (_, e) -> 
     let res = eval_d e env in 
@@ -224,34 +236,9 @@ let rec eval_d (exp : expr) (env : Env.env) : Env.value =
     | Env.Val (Num x) -> Env.Val (Num ~-x)
     | _ -> Env.Val (Raise))
   | Binop (b, e1, e2) ->
-    (let res1 = eval_d e1 env in 
+    let res1 = eval_d e1 env in 
     let res2 = eval_d e2 env in 
-    let res_check () =
-      match res1, res2 with
-      | Env.Val (Num _), Env.Val (Num _) -> Some true
-      | Env.Val (Bool _), Env.Val (Bool _) -> Some false
-      | _ -> None in
-    let check = res_check () in
-    if check <> None then
-      (match b with
-      | Equals -> Env.Val (Bool ((res1) = (res2))) 
-      | LessThan -> Env.Val (Bool ((res1) < (res2)))
-      | _ -> if check = Some true then 
-              Env.Val (Num ((match b with
-                         | Plus -> (+)
-                         | Minus -> (-)
-                         | Times -> ( * )
-                         | _ -> raise (Invalid_argument "Match case never reached")) 
-                         (match res1 with
-                          | Env.Val (Num x) -> x 
-                          | _ -> raise (Failure "Case never reached")) 
-                         (match res2 with
-                          | Env.Val (Num x) -> x 
-                          | _ -> raise (Failure "Case never reached"))))
-             else
-              raise (EvalError "Operation not allowed"))
-    else
-      raise (EvalError "Operation not allowed"))
+    Val (binopeval b (val_to_exp res1) (val_to_exp res2))
   | Conditional (e1, e2, e3) -> 
     (let res1 = eval_d e1 env in 
     match res1 with
@@ -265,13 +252,11 @@ let rec eval_d (exp : expr) (env : Env.env) : Env.value =
     v_b
   | Raise -> raise EvalException 
   | Unassigned -> raise (EvalError "Encountered Unassigned expression")
-  | App (f, e2) -> 
-    let v_p = eval_d f env in 
-     match v_p with
+  | App (f, e) ->  
+     (match eval_d f env with
      | Env.Val (Fun (v, b)) -> 
-      (let v_q = eval_d e2 env in 
-      eval_d b (Env.extend env v (ref v_q)))
-     | _ -> raise (EvalError "v_p not a function") ;;
+      eval_d b (Env.extend env v (ref (eval_d e env)))
+     | _ -> raise (EvalError "Not a function")) ;;
        
 (* The LEXICALLY-SCOPED ENVIRONMENT MODEL evaluator -- optionally
    completed as (part of) your extension *)
@@ -279,6 +264,7 @@ let rec eval_d (exp : expr) (env : Env.env) : Env.value =
 let rec eval_l (exp : expr) (env : Env.env) : Env.value =
   match exp with
   | Var v -> Env.lookup env v
+  | Float x -> Env.Val (Float x)
   | Num x -> Env.Val (Num x)
   | Bool b -> Env.Val (Bool b)
   | Unop (_, e) -> 
@@ -287,34 +273,9 @@ let rec eval_l (exp : expr) (env : Env.env) : Env.value =
     | Env.Val (Num x) -> Env.Val (Num ~-x)
     | _ -> Env.Val (Raise))
   | Binop (b, e1, e2) ->
-    (let res1 = eval_l e1 env in 
+    let res1 = eval_l e1 env in 
     let res2 = eval_l e2 env in 
-    let res_check () =
-      match res1, res2 with
-      | Env.Val (Num _), Env.Val (Num _) -> Some true
-      | Env.Val (Bool _), Env.Val (Bool _) -> Some false
-      | _ -> None in
-    let check = res_check () in
-    if check <> None then
-      (match b with
-      | Equals -> Env.Val (Bool ((res1) = (res2))) 
-      | LessThan -> Env.Val (Bool ((res1) < (res2)))
-      | _ -> if check = Some true then 
-              Env.Val (Num ((match b with
-                         | Plus -> (+)
-                         | Minus -> (-)
-                         | Times -> ( * )
-                         | _ -> raise (Invalid_argument "Match case never reached")) 
-                         (match res1 with
-                          | Env.Val (Num x) -> x 
-                          | _ -> raise (Failure "Case never reached")) 
-                         (match res2 with
-                          | Env.Val (Num x) -> x 
-                          | _ -> raise (Failure "Case never reached"))))
-             else
-              raise (EvalError "Operation not allowed"))
-    else
-      raise (EvalError "Operation not allowed"))
+    Val (binopeval b (val_to_exp res1) (val_to_exp res2))
   | Conditional (e1, e2, e3) -> 
     (let res1 = eval_l e1 env in 
     match res1 with
@@ -336,7 +297,7 @@ let rec eval_l (exp : expr) (env : Env.env) : Env.value =
   | App (f, e) -> 
     let clos = eval_l f env in 
     match clos with
-    | Closure (Fun (v, b), env') -> 
+    | Env.Closure (Fun (v, b), env') -> 
       let v_q = eval_l e env in 
       let env_l = Env.extend env' v (ref v_q) in 
       eval_l b env_l 
@@ -358,4 +319,4 @@ let eval_e _ =
    above, not the `evaluate` function, so it doesn't matter how it's
    set when you submit your solution.) *)
    
-let evaluate = eval_t ;;
+let evaluate = eval_l ;;

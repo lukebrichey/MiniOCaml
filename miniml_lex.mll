@@ -32,24 +32,36 @@
     create_hashtable 8 [
                        ("=", EQUALS);
                        ("<", LESSTHAN);
+                       (">", LESSTHAN);
                        (".", DOT);
                        ("->", DOT);
                        (";;", EOF);
                        ("~-", NEG);
                        ("+", PLUS);
+                       ("+.", FPLUS);
                        ("-", MINUS);
+                       ("-.", FMINUS);
                        ("*", TIMES);
+                       ("*.", FTIMES);
                        ("(", OPEN);
                        (")", CLOSE)
                      ]
 }
 
 let digit = ['0'-'9']
+let deci = '.' digit*
+let float = digit* deci?
 let id = ['a'-'z'] ['a'-'z' '0'-'9']*
-let sym = ['(' ')'] | (['$' '&' '*' '+' '-' '/' '=' '<' '>' '^'
+let quotes = ['"']
+let string = [^ '"' '\\']+
+let sym = ['(' ')'] | (['$' '&' '*' '+' '-' '/' '=' '<' '>' '^' 
                             '.' '~' ';' '!' '?' '%' ':' '#']+)
 
-rule token = parse
+rule token = parse 
+  | float as fnum
+        { let num = float_of_string fnum in
+          FLOAT num
+        }
   | digit+ as inum
         { let num = int_of_string inum in
           INT num
