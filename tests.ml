@@ -217,10 +217,10 @@ let stage6_tests () =
               with 
                 EvalError (_) -> true | _ -> false)
         "lookup fail";
-    unit_test (Env.value_to_string (Closure (Num (1), empty)) 
+    unit_test (Env.value_to_string (Env.Closure (Num (1), empty)) 
                 = "Closure (Val = 1, Env : {})")
         "value_to_string closure w env";
-    unit_test (Env.value_to_string ~printenvp: false (Closure (Num (1), empty)) 
+    unit_test (Env.value_to_string ~printenvp: false (Env.Closure (Num (1), empty)) 
                 = "Closure (Val = 1, Env : {})")
         "value_to_string closure w/o env";
     let test_env = 

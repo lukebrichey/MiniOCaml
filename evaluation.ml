@@ -127,7 +127,7 @@ module Env : ENV =
 (* HELPERS *)
 let val_to_exp (v : Env.value) : expr =
   match v with
-  | Val (x) -> x
+  | Env.Val (x) -> x
   | _ -> raise EvalException
 
 let binopeval (b : binop) (exp1 : expr) (exp2 : expr) : expr =
@@ -200,7 +200,7 @@ let rec eval_s (exp : expr) (env : Env.env) : Env.value =
   | Binop (b, e1, e2) ->
     let res1 = eval_s e1 env in 
     let res2 = eval_s e2 env in 
-    Val (binopeval b (val_to_exp res1) (val_to_exp res2))
+    Env.Val (binopeval b (val_to_exp res1) (val_to_exp res2))
   | Conditional (e1, e2, e3) -> 
     (let res1 = eval_s e1 env in 
     match res1 with
@@ -244,7 +244,7 @@ let rec eval_d (exp : expr) (env : Env.env) : Env.value =
   | Binop (b, e1, e2) ->
     let res1 = eval_d e1 env in 
     let res2 = eval_d e2 env in 
-    Val (binopeval b (val_to_exp res1) (val_to_exp res2))
+    Env.Val (binopeval b (val_to_exp res1) (val_to_exp res2))
   | Conditional (e1, e2, e3) -> 
     (let res1 = eval_d e1 env in 
     match res1 with
@@ -282,7 +282,7 @@ let rec eval_l (exp : expr) (env : Env.env) : Env.value =
   | Binop (b, e1, e2) ->
     let res1 = eval_l e1 env in 
     let res2 = eval_l e2 env in 
-    Val (binopeval b (val_to_exp res1) (val_to_exp res2))
+    Env.Val (binopeval b (val_to_exp res1) (val_to_exp res2))
   | Conditional (e1, e2, e3) -> 
     (let res1 = eval_l e1 env in 
     match res1 with
