@@ -186,7 +186,8 @@ let rec exp_to_concrete_string (exp : expr) : string =
                    ^ " in " ^ exp_to_concrete_string e2
   | Raise -> "Exception"
   | Unassigned -> "Unassigned"
-  | App (f, e) -> "(" ^ exp_to_concrete_string f ^ ") " ^ exp_to_concrete_string e ;;
+  | App (f, e) -> 
+      "(" ^ exp_to_concrete_string f ^ ") " ^ exp_to_concrete_string e ;;
      
 (* exp_to_abstract_string exp -- Return a string representation of the
    abstract syntax of the expression `exp` *)

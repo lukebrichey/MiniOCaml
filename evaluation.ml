@@ -91,8 +91,9 @@ module Env : ENV =
 
     and env_to_string (env : env) : string =
       "{" ^ (List.fold_left (fun acc e -> 
-                            let var, value = e in 
-                            "" ^ var ^ " |-> " ^ value_to_string !value ^ ";" ^ acc) 
+                              let var, value = e in 
+                              "" ^ var ^ " |-> " ^ value_to_string !value ^ ";" 
+                              ^ acc) 
                             "" 
                             env) ^
       "}"
@@ -196,7 +197,7 @@ let rec eval_s (exp : expr) (env : Env.env) : Env.value =
     let res = eval_s e env in 
     (match res with
     | Env.Val (Num x) -> Env.Val (Num ~-x)
-    | _ -> Env.Val (Raise))
+    | _ -> raise (EvalError "Operation not allowed"))
   | Binop (b, e1, e2) ->
     let res1 = eval_s e1 env in 
     let res2 = eval_s e2 env in 
@@ -205,7 +206,7 @@ let rec eval_s (exp : expr) (env : Env.env) : Env.value =
     (let res1 = eval_s e1 env in 
     match res1 with
     | Env.Val (Bool b) -> if b then eval_s e2 env else eval_s e3 env
-    | _ -> Env.Val (Raise)) 
+    | _ -> raise (EvalError "Expected bool")) 
   | Fun (v, e) -> Env.Val (Fun (v, e))
   | Let (v, e1, e2) -> 
     let x = val_to_exp (eval_s e1 env) in eval_s (subst v x e2) env
@@ -216,7 +217,7 @@ let rec eval_s (exp : expr) (env : Env.env) : Env.value =
       let b_subbed = subst v v_dsub e2 in 
       eval_s b_subbed env
   | Raise -> raise EvalException 
-  | Unassigned -> raise (EvalError "This shouldn't happen")
+  | Unassigned -> raise (EvalError "Encountered Unassigned")
   | App (f, e) -> 
     (match eval_s f env with 
      | Env.Val (Fun (v, b)) -> 
@@ -240,7 +241,7 @@ let rec eval_d (exp : expr) (env : Env.env) : Env.value =
     let res = eval_d e env in 
     (match res with
     | Env.Val (Num x) -> Env.Val (Num ~-x)
-    | _ -> Env.Val (Raise))
+    | _ -> raise (EvalError "Operation not allowed"))
   | Binop (b, e1, e2) ->
     let res1 = eval_d e1 env in 
     let res2 = eval_d e2 env in 
@@ -249,7 +250,7 @@ let rec eval_d (exp : expr) (env : Env.env) : Env.value =
     (let res1 = eval_d e1 env in 
     match res1 with
     | Env.Val (Bool b) -> if b then eval_d e2 env else eval_d e3 env 
-    | _ -> Env.Val (Raise)) 
+    | _ -> raise (EvalError "Expected bool")) 
   | Fun (v, e) -> Env.Val (Fun (v, e))
   | Let (v, e1, e2)
   | Letrec (v, e1, e2) -> 
@@ -278,7 +279,7 @@ let rec eval_l (exp : expr) (env : Env.env) : Env.value =
     let res = eval_l e env in 
     (match res with
     | Env.Val (Num x) -> Env.Val (Num ~-x)
-    | _ -> Env.Val (Raise))
+    | _ -> raise (EvalError "Operator not allowed"))
   | Binop (b, e1, e2) ->
     let res1 = eval_l e1 env in 
     let res2 = eval_l e2 env in 
@@ -287,7 +288,7 @@ let rec eval_l (exp : expr) (env : Env.env) : Env.value =
     (let res1 = eval_l e1 env in 
     match res1 with
     | Env.Val (Bool b) -> if b then eval_l e2 env else eval_l e3 env 
-    | _ -> Env.Val (Raise)) 
+    | _ -> raise (EvalError "Expected boolean in condition")) 
   | Fun (v, b) -> Env.close (Fun (v, b)) env 
   | Let (v, e1, e2) -> 
     let v_d = eval_l e1 env in 

@@ -50,8 +50,7 @@
 }
 
 let digit = ['0'-'9']
-let deci = '.' digit*
-let float = digit* deci?
+let float = digit* '.' digit*?
 let id = ['a'-'z'] ['a'-'z' '0'-'9']*
 let string = ['"']  [^ '"' '\\']+ ['"']
 let sym = ['(' ')'] | (['$' '&' '*' '+' '-' '/' '=' '<' '>' '^' 
